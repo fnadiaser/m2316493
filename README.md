@@ -12,4 +12,5 @@
 - для проверки json скопировать код из каждого json-файла и вставить в n8n (разные workflow).
 
 # Если не входит по ссылке, то QR-код:
-![telegram-cloud-photo-size-2-5359332081571402427-y](https://github.com/user-attachments/assets/35e41702-b440-496c-8e50-a37132e61207)
+![telegram-cloud-photo-size-2-5359332081571402429-y](https://github.com/user-attachments/assets/1f772664-ece2-4ebe-aa08-e27c776c8a14)
+
