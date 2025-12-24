@@ -1,0 +1,331 @@
+{
+  "name": "Workflow A",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c963f3c4-6d5e-487d-b16b-05d005d930f4",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "driveId": {
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "1S7FSGvb8-Qg3Vl-sTWlygjlpZ7t9g6B9",
+            "mode": "list",
+            "cachedResultName": "АГМК",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1S7FSGvb8-Qg3Vl-sTWlygjlpZ7t9g6B9"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "70adbc6f-acbb-4090-b8f3-d3598f81e9fc",
+      "name": "Search files and folders",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "hqGOWxemoBxuXiUL",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        416,
+        -16
+      ],
+      "id": "fb72a85e-bfbe-40fc-ba9c-a40c08381be6",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        1504,
+        80
+      ],
+      "id": "6bf46a90-e61b-4a61-a473-fc215f5581ae"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        624,
+        80
+      ],
+      "id": "92522f29-2a3c-453c-9d3c-cd8091e7e637",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "hqGOWxemoBxuXiUL",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        80
+      ],
+      "id": "e7475647-601d-4011-8dd6-cff6e87f07dc",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "function chunkText(text, size = 1200, overlap = 200) {\n  const chunks = [];\n  const clean = (text || \"\").replace(/\\s+/g, \" \").trim();\n  if (!clean) return chunks;\n\n  let start = 0;\n  while (start < clean.length) {\n    const end = Math.min(start + size, clean.length);\n    chunks.push(clean.slice(start, end));\n    if (end === clean.length) break;\n    start = Math.max(0, end - overlap);\n  }\n  return chunks;\n}\n\nconst text = $json.data || \"\";\n\nconst docName = $node[\"Download file\"]?.binary?.data?.fileName || \"UnknownDoc\";\n\nconst chunks = chunkText(text, 1200, 200);\n\nreturn chunks.map((c, i) => ({\n  json: {\n    doc_name: docName,\n    section: \"auto\",\n    chunk_id: `${docName}_${i + 1}`,\n    chunk_text: c,\n    updated_at: new Date().toISOString()\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        80
+      ],
+      "id": "679bccb1-2f4d-42c8-81c6-cff37fa4e5fd",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I",
+          "mode": "list",
+          "cachedResultName": "АГМК",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "KB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "doc_name": "={{ $json.doc_name }}",
+            "section": "={{ $json.section }}",
+            "chunk_id": "={{ $json.chunk_id }}",
+            "chunk_text": "={{ $json.chunk_text }}",
+            "updated_at": "={{ $json.updated_at }}"
+          },
+          "matchingColumns": [
+            "doc_name"
+          ],
+          "schema": [
+            {
+              "id": "doc_name",
+              "displayName": "doc_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "section",
+              "displayName": "section",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "chunk_id",
+              "displayName": "chunk_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "chunk_text",
+              "displayName": "chunk_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1248,
+        80
+      ],
+      "id": "2f3ed802-b060-4935-b170-5b9ccdb6a848",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "iM7h9GWYsjWJSvSS",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Search files and folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search files and folders": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "2b97a57b-4606-4b62-86fc-61ffb24abc82",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2f78f49853bf98ea33254431f3a4e93f7c2d70055b32f3fe4c4e25f95925ed24"
+  },
+  "id": "8WMyLiivg1vxt32p",
+  "tags": []
+}

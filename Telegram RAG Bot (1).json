@@ -1,0 +1,482 @@
+{
+  "name": "Telegram RAG Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "id": "65970e9b-11de-41af-889e-897090154fd0",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1936,
+        112
+      ],
+      "typeVersion": 1.2,
+      "credentials": {
+        "openAiApi": {
+          "id": "Ffv9r4kXngJuOOTi",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "chatIds": "6713681895"
+        }
+      },
+      "id": "255dfd1f-f0d8-4edf-b693-10d5b46fe6a4",
+      "name": "Telegram Trigger1",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        688,
+        16
+      ],
+      "webhookId": "0195b65f-4290-4b73-9242-f4d201d94500",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "TiZI3z9Xm51mDLWJ",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "85300436-8f8e-45fb-8063-ef4f06ad9336",
+              "name": "user_id",
+              "value": "={{$json.message.from.id}}",
+              "type": "string"
+            },
+            {
+              "id": "18a1489f-29c4-466d-8eb4-f32f93493a45",
+              "name": "question",
+              "value": "={{$json.message.text}}",
+              "type": "string"
+            },
+            {
+              "id": "0fef863f-1667-4f27-a203-587b21f2d642",
+              "name": "ts_start",
+              "value": "={{$now}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        16
+      ],
+      "id": "f6b4549f-1ffd-444b-b4ba-8f233c26e539",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I",
+          "mode": "list",
+          "cachedResultName": "АГМК",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "KB",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I/edit#gid=0"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "detectAutomatically"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1104,
+        16
+      ],
+      "id": "6acc2833-6200-4a06-90b1-a7f3b5d3b13c",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "iM7h9GWYsjWJSvSS",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst TOP_K = 2;        \nconst THRESHOLD = 0.08;   \n\nconst NODE_SET = \"Edit Fields\";            \nconst NODE_SHEETS = \"Get row(s) in sheet\"; \n\nfunction normalize(s) {\n  return (s || \"\")\n    .toLowerCase()\n    .replace(/ё/g, \"е\")\n    .replace(/[^a-zа-я0-9\\s]/gi, \" \")\n    .replace(/\\s+/g, \" \")\n    .trim();\n}\n\nfunction tokenize(s) {\n  const stop = new Set([\n    \"и\",\"в\",\"во\",\"на\",\"по\",\"к\",\"ко\",\"с\",\"со\",\"из\",\"у\",\"для\",\"что\",\"это\",\"как\",\"ли\",\n    \"а\",\"но\",\"же\",\"то\",\"от\",\"до\",\"при\",\"над\",\"под\",\"за\",\"про\",\"без\",\"или\",\"если\",\n    \"мы\",\"вы\",\"они\",\"он\",\"она\",\"оно\",\"я\",\"ты\",\"мне\",\"нам\",\"вам\",\"их\",\"его\",\"ее\",\n    \"так\",\"тут\",\"там\",\"где\",\"когда\",\"какой\",\"какая\",\"какие\",\"каков\",\"какова\"\n  ]);\n\n  return normalize(s)\n    .split(\" \")\n    .filter(t => t.length >= 3 && !stop.has(t));\n}\n\n// простой скоринг: совпадения токенов + бонус за точные фразы\nfunction scoreChunk(qTokens, qNorm, chunkText) {\n  const cNorm = normalize(chunkText);\n  if (!cNorm) return 0;\n\n  const cTokens = new Set(cNorm.split(\" \").filter(x => x.length >= 3));\n\n  let hit = 0;\n  for (const t of qTokens) {\n    if (cTokens.has(t)) hit += 1;\n  }\n\n  let phraseBonus = 0;\n  if (qNorm.length >= 8 && cNorm.includes(qNorm)) phraseBonus = 2;\n\n  // нормализация\n  const base = hit / Math.sqrt(qTokens.length + 1);\n  return base + phraseBonus;\n}\n\nconst question = $items(NODE_SET)?.[0]?.json?.question || \"\";\nconst qNorm = normalize(question);\nconst qTokens = tokenize(question);\n\nif (!question.trim()) {\n  return [{\n    json: {\n      question: \"\",\n      foundEnough: false,\n      topScore: 0,\n      topChunks: [],\n      note: \"empty_question\"\n    }\n  }];\n}\n\nconst rows = $items(NODE_SHEETS).map(i => i.json);\n\nif (!rows.length) {\n  return [{\n    json: {\n      question,\n      foundEnough: false,\n      topScore: 0,\n      topChunks: [],\n      note: \"kb_empty\"\n    }\n  }];\n}\n\nconst scored = rows.map(r => {\n  const chunkText = r.chunk_text || \"\";\n  const s = scoreChunk(qTokens, qNorm, chunkText);\n\n  return {\n    doc_name: r.doc_name || \"UnknownDoc\",\n    chunk_id: r.chunk_id || \"\",\n    section: r.section || \"auto\",\n    chunk_text: chunkText,\n    score: s\n  };\n});\n\nscored.sort((a, b) => b.score - a.score);\n\nconst top = scored.slice(0, TOP_K);\nconst topScore = top[0]?.score || 0;\n\nconst topChunks = top\n  .filter(t => t.score > 0)\n  .map(t => ({\n    doc_name: t.doc_name,\n    chunk_id: t.chunk_id,\n    section: t.section,\n    score: Math.round(t.score * 1000) / 1000,\n    chunk_text: (t.chunk_text || \"\").slice(0, 1800)\n  }));\n\nreturn [{\n  json: {\n    question,\n    foundEnough: topScore >= THRESHOLD && topChunks.length > 0,\n    topScore: Math.round(topScore * 1000) / 1000,\n    topChunks\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        16
+      ],
+      "id": "6d855e99-90cf-424e-b1b4-8f3ac75ae629",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c54aa673-30fe-48de-b782-5916bc9cfe56",
+              "leftValue": "={{ $json.foundEnough }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1520,
+        16
+      ],
+      "id": "355db2b8-b54f-4417-aa34-00fc623664e3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7e42eabe-c8da-4ec5-ab3f-66916c3ca2ee",
+              "name": "prompt",
+              "value": "=Ты помощник ПДО по планированию и контролю переработки концентрата руд.\nОтвечай строго на основе контекста из методик ниже. Ничего не выдумывай.\nЕсли в контексте нет ответа, напиши: \"В методиках нет данных для точного ответа\" и задай 2 уточняющих вопроса.\n\nФормат ответа:\n1) Краткий вывод (1-2 предложения)\n2) Что сделать по шагам (3-7 пунктов)\n3) Проверка входных данных (чек-лист)\n4) Источники (doc_name и chunk_id)\n\nВопрос пользователя:\n{{$json.question}}\n\nКонтекст из методик:\n{{ $json.topChunks.map(c => `Источник: ${c.doc_name}, ${c.chunk_id}\\n${c.chunk_text}`).join(\"\\n\\n\") }}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1728,
+        -80
+      ],
+      "id": "a43750ca-38eb-430b-94ff-8fdc8c06695f",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {}
+      },
+      "id": "babe0212-f0cb-467a-9fae-5be8e1b77c1a",
+      "name": "Manager",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1952,
+        -80
+      ],
+      "typeVersion": 1.7
+    },
+    {
+      "parameters": {
+        "chatId": "={{$node[\"Telegram Trigger1\"].json.message.chat.id}}",
+        "text": "В методиках не нашлось прямого ответа. Уточните, пожалуйста: 1) период (день, неделя, месяц), 2) участок или объект (цех, линия, узел), 3) какие исходные данные уже есть (план, факт, остатки, ограничения).",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1728,
+        112
+      ],
+      "id": "ac18331c-ce68-4531-bb3a-d3027be7c6f9",
+      "name": "Send a text message",
+      "webhookId": "7f58844f-382d-4065-b941-d82b09934ae1",
+      "credentials": {
+        "telegramApi": {
+          "id": "TiZI3z9Xm51mDLWJ",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{$node[\"Telegram Trigger1\"].json.message.chat.id}}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2304,
+        -80
+      ],
+      "id": "05a2c594-0705-4ec4-875e-4bed1ce952e0",
+      "name": "Send a text message1",
+      "webhookId": "747249d3-1ef5-4147-9836-5b5e945da7bb",
+      "credentials": {
+        "telegramApi": {
+          "id": "TiZI3z9Xm51mDLWJ",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I",
+          "mode": "list",
+          "cachedResultName": "АГМК",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 154898627,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yiLkF0MK8WO4EiMAohjzTUWwst9VtU3C1DX401nRS3I/edit#gid=154898627"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ts": "={{$node['Edit Fields'].json.ts_start }}",
+            "question": "={{$node['Edit Fields'].json.question }}",
+            "user_id": "={{$node['Edit Fields'].json.user_id }}",
+            "answer": "={{ $('Edit Fields1').item.json.prompt }}",
+            "top_docs": "={{ $('Code in JavaScript').item.json.topChunks[0].doc_name }}"
+          },
+          "matchingColumns": [
+            "ts"
+          ],
+          "schema": [
+            {
+              "id": "ts",
+              "displayName": "ts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "question",
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "top_docs",
+              "displayName": "top_docs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "answer",
+              "displayName": "answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2512,
+        -80
+      ],
+      "id": "257b53c3-8361-445d-9d7d-5a007acee370",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "iM7h9GWYsjWJSvSS",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Manager",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manager": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "dc1a9cc3-893b-4717-91c8-57550cfb036e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2f78f49853bf98ea33254431f3a4e93f7c2d70055b32f3fe4c4e25f95925ed24"
+  },
+  "id": "gR7cbaOwc393Yct6",
+  "tags": []
+}
